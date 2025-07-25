@@ -95,9 +95,10 @@ public class TeamController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         boolean isAdmin = userService.isAdmin(request);
+        // 1. 查询用户列表
         List<TeamUserVO> teamList = teamService.listTeams(teamQuery, isAdmin);
-        // 判断当前用户是否已加入队伍
-        List<Long> teamIdList = teamList.stream().map(TeamUserVO::getId).toList();
+        final List<Long> teamIdList = teamList.stream().map(TeamUserVO::getId).toList();
+        // 2. 判断当前用户是否已加入队伍
         QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
         try {
             User loginUser = userService.getLoginUser(request);
@@ -111,6 +112,14 @@ public class TeamController {
             });
         } catch (Exception e) {
         }
+        // 3. 查询加入队伍的人数
+        QueryWrapper<UserTeam> userTeamJoinQueryWrapper = new QueryWrapper<>();
+        userTeamJoinQueryWrapper.in("teamId", teamIdList);
+        List<UserTeam> userTeamList = userTeamService.list(userTeamJoinQueryWrapper);
+        Map<Long, List<UserTeam>> teamIdUserTeamList = userTeamList.stream().collect(Collectors.groupingBy(UserTeam::getTeamId));
+        teamList.forEach(team -> {
+            team.setHasJoinNum(teamIdUserTeamList.getOrDefault(team.getId(), new ArrayList<>()).size());
+        });
         return ResultUtils.success(teamList);
     }
 
